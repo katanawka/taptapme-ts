@@ -13,9 +13,11 @@ const CharacterDisplay: React.FC<CharacterDisplayProps> = ({
   typedChar,
   isCurrent,
 }) => {
+  // Determine the status of this character
   const isCorrect = typedChar === expectedChar;
   const isIncorrect = typedChar !== null && typedChar !== expectedChar;
   
+  // Special handling for spaces
   const isSpace = expectedChar === " ";
   
   return (
@@ -26,7 +28,7 @@ const CharacterDisplay: React.FC<CharacterDisplayProps> = ({
         isCorrect ? "text-white" : "",
         isIncorrect ? "text-[#ea384c] relative" : "",
         isCurrent ? "border-b-2 border-white animate-pulse-subtle" : "", 
-        !typedChar ? "text-gray-500" : "",
+        !typedChar ? "text-gray-500" : "", // Changed to readable gray
         isCurrent ? "text-white" : ""
       )}
     >

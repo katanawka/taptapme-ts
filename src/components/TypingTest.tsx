@@ -1,8 +1,10 @@
+
 import React, { useState, useEffect, useRef, KeyboardEvent } from "react";
 import { generateRandomText, generateLongerText } from "@/utils/textGenerator";
 import { RefreshCw } from "lucide-react";
 import CharacterDisplay from "./CharacterDisplay";
 import TypingStats from "./TypingStats";
+import { useNavigate } from "react-router-dom";
 
 const typingSound = new Audio("/keyboard-click.mp3");
 const errorSound = new Audio("/keyboard-error.mp3");
@@ -25,6 +27,7 @@ const TypingTest: React.FC = () => {
   const [isFocused, setIsFocused] = useState<boolean>(true);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     resetTest();
@@ -53,6 +56,7 @@ const TypingTest: React.FC = () => {
             clearInterval(timer);
             setIsCompleted(true);
             setIsTimerRunning(false);
+            saveStatsAndNavigate();
             return 0;
           }
           return prevTime - 1;
@@ -88,6 +92,28 @@ const TypingTest: React.FC = () => {
       }, 1000);
     }
   }, [typedText, text]);
+
+  const saveStatsAndNavigate = () => {
+    if (wpm > 0) {
+      const newStat = {
+        id: Date.now(),
+        date: new Date().toLocaleDateString(),
+        wpm: Math.round(wpm),
+        accuracy: Math.round(accuracy)
+      };
+
+      const savedStats = localStorage.getItem("typingStats");
+      const stats = savedStats ? JSON.parse(savedStats) : [];
+      
+      localStorage.setItem("typingStats", JSON.stringify([...stats, newStat]));
+      
+      setTimeout(() => {
+        navigate("/statistics");
+      }, 1500);
+    } else {
+      navigate("/statistics");
+    }
+  };
 
   const resetTest = () => {
     setText(generateLongerText(3));
@@ -168,7 +194,6 @@ const TypingTest: React.FC = () => {
 
   const handleContainerClick = () => {
     setIsFocused(true);
-
     if (startTime !== null && !isCompleted) {
       setIsTimerRunning(true);
     }
@@ -208,7 +233,7 @@ const TypingTest: React.FC = () => {
           
           {!isFocused && (
             <div className="absolute inset-0 flex items-center justify-center z-10">
-              <div className="px-6 py-3 rounded-lg">
+              <div className="rounded-lg">
                 <span className="text-white text-lg font-medium">
                   Нажмите сюда чтобы продолжить
                 </span>
@@ -251,7 +276,7 @@ const TypingTest: React.FC = () => {
         )}
       </div>
       
-      <div className="text-center text-gray-400 text-xs fixed bottom-16">
+      <div className="text-center text-gray-400 text-xs fixed bottom-8">
         <kbd className="px-1 py-0.5 bg-white text-black rounded mr-1 text-xs font-medium">Tab</kbd> + 
         <kbd className="px-1 py-0.5 bg-white text-black rounded ml-1 text-xs font-medium">Enter</kbd> чтобы начать заново
       </div>
