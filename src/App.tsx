@@ -11,7 +11,6 @@ import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
 
-// AnimationWrapper component to wrap routes with AnimatePresence
 const AnimationLayout = () => {
   const location = useLocation();
   

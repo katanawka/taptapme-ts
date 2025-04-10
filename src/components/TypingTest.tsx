@@ -1,16 +1,34 @@
 
 import React, { useState, useEffect, useRef, KeyboardEvent } from "react";
 import { generateRandomText, generateLongerText } from "@/utils/textGenerator";
-import { RefreshCw } from "lucide-react";
+import { RefreshCw, Clock, Type, Hash } from "lucide-react";
 import CharacterDisplay from "./CharacterDisplay";
 import TypingStats from "./TypingStats";
 import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { toast } from "sonner";
+import { 
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter
+} from "@/components/ui/dialog";
+import { 
+  ToggleGroup,
+  ToggleGroupItem
+} from "@/components/ui/toggle-group";
+import { Separator } from "@/components/ui/separator";
 
 const typingSound = new Audio("/keyboard-click.mp3");
 const errorSound = new Audio("/keyboard-error.mp3");
 
 typingSound.load();
 errorSound.load();
+
+const DEFAULT_TIME_OPTIONS = [15, 30, 60, 120];
 
 const TypingTest: React.FC = () => {
   const [text, setText] = useState<string>("");
@@ -20,20 +38,34 @@ const TypingTest: React.FC = () => {
   const [wpm, setWpm] = useState<number>(0);
   const [accuracy, setAccuracy] = useState<number>(100);
   const [timeLeft, setTimeLeft] = useState<number>(30);
+  const [selectedTime, setSelectedTime] = useState<number>(30);
+  const [customTime, setCustomTime] = useState<string>("");
   const [isTimerRunning, setIsTimerRunning] = useState<boolean>(false);
   const [totalKeystrokes, setTotalKeystrokes] = useState<number>(0);
   const [correctKeystrokes, setCorrectKeystrokes] = useState<number>(0);
   const [tabPressed, setTabPressed] = useState<boolean>(false);
   const [isFocused, setIsFocused] = useState<boolean>(true);
+  const [isCustomTimeDialogOpen, setIsCustomTimeDialogOpen] = useState<boolean>(false);
+  const [includeNumbers, setIncludeNumbers] = useState<boolean>(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const [testMode, setTestMode] = useState<{
+    time: number, 
+    numbers: boolean, 
+    punctuation: boolean
+  }>({
+    time: 30,
+    numbers: false,
+    punctuation: false
+  });
 
   useEffect(() => {
     resetTest();
     
     const handleClickOutside = (e: MouseEvent) => {
-      if (containerRef.current && !containerRef.current.contains(e.target as Node)) {
+      if (containerRef.current && !containerRef.current.contains(e.target as Node) &&
+          !document.querySelector('.buttons-container')?.contains(e.target as Node)) {
         setIsFocused(false);
         setIsTimerRunning(false);
       }
@@ -116,13 +148,13 @@ const TypingTest: React.FC = () => {
   };
 
   const resetTest = () => {
-    setText(generateLongerText(3));
+    setText(generateLongerText(12, testMode.numbers));
     setTypedText("");
     setIsCompleted(false);
     setStartTime(null);
     setWpm(0);
     setAccuracy(100);
-    setTimeLeft(30);
+    setTimeLeft(selectedTime);
     setIsTimerRunning(false);
     setTotalKeystrokes(0);
     setCorrectKeystrokes(0);
@@ -135,7 +167,7 @@ const TypingTest: React.FC = () => {
   };
 
   const loadNewText = () => {
-    setText(generateLongerText(3));
+    setText(generateLongerText(12, testMode.numbers));
     setTypedText("");
     
     if (inputRef.current) {
@@ -193,34 +225,207 @@ const TypingTest: React.FC = () => {
   };
 
   const handleContainerClick = () => {
-    setIsFocused(true);
-    if (startTime !== null && !isCompleted) {
-      setIsTimerRunning(true);
+    if (!isFocused) {
+      setIsFocused(true);
+      if (startTime !== null && !isCompleted) {
+        setIsTimerRunning(true);
+      }
     }
     inputRef.current?.focus();
   };
 
+  const handleTimeChange = (newTime: number) => {
+    if (newTime === testMode.time) return;
+    
+    if (startTime !== null) {
+      setSelectedTime(newTime);
+      setTimeLeft(newTime);
+      resetTest();
+    } else {
+      setSelectedTime(newTime);
+      setTimeLeft(newTime);
+    }
+  };
+
+  const handleModeChange = (type: 'time' | 'numbers' | 'punctuation', value: number | boolean) => {
+    if (type === 'numbers' && testMode.numbers === value) return;
+    if (type === 'time' && testMode.time === value) return;
+    
+    const newMode = { ...testMode, [type]: value };
+    setTestMode(newMode);
+
+    if (type === 'time' && startTime !== null) {
+      setSelectedTime(value as number);
+      setTimeLeft(value as number);
+      resetTest();
+    } else if (type !== 'time') {
+      resetTest();
+    }
+  };
+
+  const parseCustomTimeInput = (input: string): number | null => {
+    let totalSeconds = 0;
+    
+    if (/^\d+$/.test(input)) {
+      return parseInt(input, 10);
+    }
+    
+    const hoursMatch = input.match(/(\d+)h/);
+    if (hoursMatch) {
+      totalSeconds += parseInt(hoursMatch[1], 10) * 3600;
+    }
+    
+    const minutesMatch = input.match(/(\d+)m/);
+    if (minutesMatch) {
+      totalSeconds += parseInt(minutesMatch[1], 10) * 60;
+    }
+    
+    return totalSeconds > 0 ? totalSeconds : null;
+  };
+
+  const applyCustomTime = () => {
+    const parsedTime = parseCustomTimeInput(customTime);
+    
+    if (!parsedTime) {
+      toast("Неверное значение времени", {
+        description: "Пожалуйста, введите число или используйте формат h/m (например, 1h30m)",
+        style: { background: "#121318", color: "#e5e7eb", borderColor: "rgba(255,255,255,0.1)" }
+      });
+      return;
+    }
+    
+    if (parsedTime < 5 || parsedTime > 3600) {
+      toast("Неверное значение времени", {
+        description: "Пожалуйста, введите значение от 5 секунд до 1 часа",
+        style: { background: "#121318", color: "#e5e7eb", borderColor: "rgba(255,255,255,0.1)" }
+      });
+      return;
+    }
+    
+    setSelectedTime(parsedTime);
+    setTimeLeft(parsedTime);
+    setIsCustomTimeDialogOpen(false);
+    
+    if (startTime !== null) {
+      resetTest();
+    }
+  };
+
   return (
     <div 
-      ref={containerRef}
-      className="flex flex-col items-center justify-center min-h-[60vh] px-4 cursor-text relative"
-      onClick={handleContainerClick}
+      className="flex flex-col items-center justify-center min-h-[60vh] px-4 relative"
     >
       <input
         ref={inputRef}
         type="text"
-        className="opacity-0 absolute pointer-events-none"
+        className="opacity-0 absolute left-0 top-0 w-2 h-2 pointer-events-none"
         onKeyDown={handleKeyDown}
         autoFocus
       />
 
       <div className="max-w-3xl w-full mb-6">
+        
+        <div className="buttons-container flex flex-col items-center justify-center w-full mb-6 gap-2">
+          <div className="flex bg-[#0f0f13] rounded-lg px-2 py-1 gap-1 w-full max-w-md justify-center shadow-sm">
+            <ToggleGroup 
+              type="single" 
+              value={String(testMode.time)} 
+              onValueChange={(value) => value && handleModeChange('time', Number(value))}
+              className="flex items-center"
+            >
+              {DEFAULT_TIME_OPTIONS.map((time) => (
+                <ToggleGroupItem
+                  key={time}
+                  value={String(time)}
+                  aria-label={`${time} seconds`}
+                  className={`px-3 py-1.5 rounded-md transition-colors ${
+                    testMode.time === time ? 
+                    'bg-yellow-300/20 text-yellow-300 data-[state=on]:bg-yellow-300/20 data-[state=on]:text-yellow-300' : 
+                    'text-gray-400 hover:bg-[#1a1a1f] hover:text-gray-200'
+                  }`}
+                >
+                  {time}
+                </ToggleGroupItem>
+              ))}
+              
+              <ToggleGroupItem 
+                value="custom"
+                aria-label="Custom time"
+                onClick={() => setIsCustomTimeDialogOpen(true)}
+                className={`px-3 py-1.5 rounded-md transition-colors ${
+                  !DEFAULT_TIME_OPTIONS.includes(testMode.time) ? 
+                  'bg-yellow-300/20 text-yellow-300 data-[state=on]:bg-yellow-300/20 data-[state=on]:text-yellow-300' : 
+                  'text-gray-400 hover:bg-[#1a1a1f] hover:text-gray-200'
+                }`}
+              >
+                <Clock className="h-4 w-4" />
+              </ToggleGroupItem>
+            </ToggleGroup>
+
+            <Separator 
+              orientation="vertical" 
+              className="mx-2 h-6 bg-gray-700/50 w-[2px] self-center" 
+            />
+
+            <div className="flex items-center space-x-1">
+              <ToggleGroup 
+                type="single" 
+                value={testMode.numbers ? 'numbers' : 'default'}
+                onValueChange={(value) => {
+                  if (value) handleModeChange('numbers', value === 'numbers');
+                }}
+                className="flex items-center"
+              >
+                <ToggleGroupItem 
+                  value="default"
+                  className={`px-2 py-1.5 rounded-md transition-colors flex items-center gap-1 ${
+                    !testMode.numbers ? 
+                    'bg-yellow-300/20 text-yellow-300 data-[state=on]:bg-yellow-300/20 data-[state=on]:text-yellow-300' : 
+                    'text-gray-400 hover:bg-[#1a1a1f] hover:text-gray-200'
+                  }`}
+                >
+                  <Type className="h-4 w-4" />
+                  <span className="text-xs">Обычный</span>
+                </ToggleGroupItem>
+                <ToggleGroupItem 
+                  value="numbers"
+                  className={`px-2 py-1.5 rounded-md transition-colors flex items-center gap-1 ${
+                    testMode.numbers ? 
+                    'bg-yellow-300/20 text-yellow-300 data-[state=on]:bg-yellow-300/20 data-[state=on]:text-yellow-300' : 
+                    'text-gray-400 hover:bg-[#1a1a1f] hover:text-gray-200'
+                  }`}
+                >
+                  <Hash className="h-4 w-4" />
+                  <span className="text-xs">Числа</span>
+                </ToggleGroupItem>
+              </ToggleGroup>
+            </div>
+          </div>
+        </div>
+
         <div className="text-center mb-2">
-          <span className="text-xl font-medium text-white">{timeLeft}s</span>
+          {startTime !== null && (
+            <span className="font-mono text-2xl font-light text-yellow-300">{timeLeft}</span>
+          )}
         </div>
         
-        <div className="text-center mb-6 space-x-1 leading-relaxed relative">
-          <div className={`${!isFocused ? 'blur-[3px]' : ''}`}>
+        <div 
+          ref={containerRef}
+          className="text-center mb-6 leading-relaxed relative w-full cursor-text" 
+          onClick={handleContainerClick}
+        >
+          <div 
+            className={`${!isFocused ? 'blur-[3px]' : ''} transition-none max-w-2xl mx-auto`}
+            style={{ 
+              wordWrap: 'break-word',
+              wordBreak: 'normal',
+              whiteSpace: 'pre-wrap',
+              lineHeight: '1.8',
+              height: '7.2em',
+              overflow: 'hidden',
+              userSelect: 'none'
+            }}
+          >
             {text.split("").map((char, index) => (
               <CharacterDisplay
                 key={index}
@@ -249,11 +454,11 @@ const TypingTest: React.FC = () => {
             <div className="flex justify-center mt-4">
               <button 
                 onClick={resetTest} 
-                className="p-2 rounded-full hover:bg-yellow-300/20 transition-colors"
+                className="p-2 rounded-full hover:bg-yellow-300/20 transition-colors group"
               >
                 <RefreshCw 
                   size={24} 
-                  className="text-gray-500 hover:text-yellow-300 transition-colors" 
+                  className="group-hover:text-yellow-300 transition-colors text-gray-500" 
                 />
               </button>
             </div>
@@ -264,11 +469,11 @@ const TypingTest: React.FC = () => {
             <div className="flex justify-center mt-4">
               <button 
                 onClick={resetTest} 
-                className="p-2 rounded-full hover:bg-yellow-300/20 transition-colors"
+                className="p-2 rounded-full hover:bg-yellow-300/20 transition-colors group"
               >
                 <RefreshCw 
                   size={20} 
-                  className="text-gray-500 hover:text-yellow-300 transition-colors" 
+                  className="group-hover:text-yellow-300 transition-colors text-gray-500" 
                 />
               </button>
             </div>
@@ -280,6 +485,35 @@ const TypingTest: React.FC = () => {
         <kbd className="px-1 py-0.5 bg-white text-black rounded mr-1 text-xs font-medium">Tab</kbd> + 
         <kbd className="px-1 py-0.5 bg-white text-black rounded ml-1 text-xs font-medium">Enter</kbd> чтобы начать заново
       </div>
+      
+      <Dialog open={isCustomTimeDialogOpen} onOpenChange={setIsCustomTimeDialogOpen}>
+        <DialogContent className="bg-[#121318] border-0 text-white">
+          <DialogHeader>
+            <DialogTitle className="text-white">Продолжительность теста</DialogTitle>
+            <DialogDescription>
+              Введите желаемую продолжительность теста
+            </DialogDescription>
+          </DialogHeader>
+          <Input 
+            type="text" 
+            placeholder="Например: 30, 1m, 1h30m" 
+            className="bg-[#1a1a1f] border-0 text-gray-300"
+            value={customTime}
+            onChange={(e) => setCustomTime(e.target.value)}
+          />
+          <p className="text-xs text-gray-400 -mt-1">
+            Вы можете использовать «h» для часов и «m» для минут, например «1h30m».
+          </p>
+          <DialogFooter>
+            <Button 
+              onClick={applyCustomTime}
+              className="bg-yellow-300/20 text-yellow-300 hover:bg-yellow-300/30"
+            >
+              Применить
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 };

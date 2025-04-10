@@ -31,12 +31,28 @@ const textSamples = [
   "The greatest glory in living lies not in never falling, but in rising every time we fall.",
 ];
 
+// Numeric text samples that can be included
+const numericSamples = [
+  "123 456 789",
+  "90 80 70 60 50 40 30 20 10",
+  "111 222 333 444 555",
+  "98 76 54 32 10",
+  "5 15 25 35 45 55 65",
+  "13579 24680",
+  "100 200 300 400 500",
+  "11 22 33 44 55 66 77",
+  "19 28 37 46 55 64 73 82 91"
+];
+
 // Monkeytype-style word generator that selects random words from the samples
-const getRandomWords = (count: number): string => {
+const getRandomWords = (count: number, includeNumbers: boolean = false): string => {
   const words: string[] = [];
+  const samples = includeNumbers 
+    ? [...textSamples, ...numericSamples] 
+    : textSamples;
   
   for (let i = 0; i < count; i++) {
-    const randomSample = textSamples[Math.floor(Math.random() * textSamples.length)];
+    const randomSample = samples[Math.floor(Math.random() * samples.length)];
     const sampleWords = randomSample.split(' ');
     const randomWord = sampleWords[Math.floor(Math.random() * sampleWords.length)]
       .replace(/[,.;:?!"]/g, ''); // Remove punctuation
@@ -48,13 +64,16 @@ const getRandomWords = (count: number): string => {
 };
 
 // Generate a random paragraph from the samples
-export const generateRandomText = (): string => {
-  const randomIndex = Math.floor(Math.random() * textSamples.length);
-  return textSamples[randomIndex];
+export const generateRandomText = (includeNumbers: boolean = false): string => {
+  const samples = includeNumbers 
+    ? [...textSamples, ...numericSamples] 
+    : textSamples;
+  const randomIndex = Math.floor(Math.random() * samples.length);
+  return samples[randomIndex];
 };
 
 // Generate a longer text by combining multiple samples
-export const generateLongerText = (numSamples: number = 3): string => {
+export const generateLongerText = (numSamples: number = 3, includeNumbers: boolean = false): string => {
   // For monkeytype style, generate random words instead of sentences
-  return getRandomWords(25); // Generate 25 random words for a test
+  return getRandomWords(40, includeNumbers); // Generate 40 random words for a test to fill more lines
 };
